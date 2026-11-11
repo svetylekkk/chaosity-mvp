@@ -242,6 +242,26 @@ button:focus-visible,textarea:focus-visible{outline:2px solid var(--coral);outli
 .mainbar.hide{opacity:0}
 .mainbar.hide .mainbtn{pointer-events:none}
 
+/* tabbar (пилюля как в макетах Chaosity) */
+.tabbar{position:absolute;left:16px;right:16px;bottom:22px;z-index:16;height:64px;border-radius:32px;background:rgba(255,255,255,.97);box-shadow:0 12px 30px -12px rgba(190,60,90,.4),0 0 0 1px rgba(239,228,236,.8);display:grid;grid-template-columns:repeat(3,1fr);align-items:center;transition:transform .3s cubic-bezier(.2,.8,.2,1),opacity .3s}
+.tabbar.hide{transform:translateY(150%);opacity:0;pointer-events:none}
+.tab{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11.5px;font-weight:500;color:#A79FA8;height:100%;justify-content:center}
+.tab svg{width:25px;height:25px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tab[aria-current="page"]{color:var(--coral)}
+.tab[aria-current="page"] svg{stroke-width:2}
+.tab .cnt{position:absolute;top:8px;left:calc(50% + 6px);min-width:18px;height:18px;border-radius:9px;background:var(--coral);color:var(--white);font-size:11px;font-weight:600;display:grid;place-items:center;padding:0 5px;font-variant-numeric:tabular-nums}
+.app.with-tabs .mainbar{padding-bottom:98px}
+.app.with-tabs .screen{padding-bottom:210px}
+
+/* saved */
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--white);border-radius:999px;padding:4px;margin-top:16px}
+.seg button{height:38px;border-radius:999px;font-weight:500;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.seg button[aria-pressed="true"]{background:var(--coral);color:var(--white)}
+.empty-s{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:48px 24px;color:var(--muted);font-size:14px;line-height:1.5}
+.empty-s svg{width:44px;height:44px;stroke:var(--coral-soft);fill:none;stroke-width:1.5}
+.empty-s b{color:var(--ink);font-size:16px}
+.empty-s .to-master{width:auto;padding:0 22px;height:44px;margin-top:6px}
+
 /* sheet */
 .backdrop{position:absolute;inset:0;background:rgba(35,27,33,.35);z-index:40;opacity:0;transition:opacity .25s}
 .backdrop.on{opacity:1}
@@ -271,6 +291,8 @@ button:focus-visible,textarea:focus-visible{outline:2px solid var(--coral);outli
   .island,.home-ind,.statusbar{display:none}
   :root{--chrome-h:52px}
   .mainbar{padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+  .tabbar{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+  .app.with-tabs .mainbar{padding-bottom:calc(86px + env(safe-area-inset-bottom,0px))}
 }
 /* внутри настоящего Telegram шапку рисует сам Telegram */
 :root.in-tg{--chrome-h:0px}
@@ -301,6 +323,7 @@ button:focus-visible,textarea:focus-visible{outline:2px solid var(--coral);outli
         <li>Убери тег «Альтернативный стиль»: порядок работ в ленте изменится.</li>
         <li>Открой работу, поставь лайк и сохрани её, затем пройди по похожим работам и вернись назад.</li>
         <li>Напиши свой запрос, например «синий кошачий глаз на длинных миндалях».</li>
+        <li>Загляни во вкладку «Сохранено»: там сохранённые и лайкнутые работы.</li>
       </ul>
     </div>
     <button class="restart" id="restart" type="button">Начать заново</button>
@@ -324,6 +347,11 @@ button:focus-visible,textarea:focus-visible{outline:2px solid var(--coral);outli
           </div>
         </header>
         <div class="mainbar" id="mainbar"><button class="mainbtn" id="mainbtn" type="button"></button></div>
+        <nav class="tabbar" id="tabbar" aria-label="Разделы">
+          <button class="tab" type="button" data-act="tab" data-tab="catalog"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="9" rx="2"/><rect x="13" y="4" width="7" height="5" rx="2"/><rect x="4" y="15" width="7" height="5" rx="2"/><rect x="13" y="11" width="7" height="9" rx="2"/></svg>Каталог</button>
+          <button class="tab" type="button" data-act="tab" data-tab="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>Поиск</button>
+          <button class="tab" type="button" data-act="tab" data-tab="saved"><svg viewBox="0 0 24 24"><path d="M6.5 4h11a1 1 0 0 1 1 1v15l-6.5-4.2L5.5 20V5a1 1 0 0 1 1-1z"/></svg>Сохранено<span class="cnt" id="savedCnt" hidden></span></button>
+        </nav>
         <div class="toast" id="toast" role="status"></div>
         <div class="home-ind"></div>
       </div>
@@ -510,7 +538,7 @@ function score(tags,q){
   return{pct:tot?Math.round(got/tot*100):0,rows,got,tot};
 }
 /* лента: работы, отсортированные по совпадению с тегами запроса */
-const feedWorks=()=>!state.tags.length?[...WORKS].sort((a,b)=>b.likes-a.likes):WORKS.map(w=>({w,p:score(w.tags,state.tags).pct})).filter(x=>x.p>0).sort((a,b)=>b.p-a.p||b.w.likes-a.w.likes).map(x=>x.w);
+const feedWorks=all=>all?[...WORKS].sort((a,b)=>b.likes-a.likes):WORKS.map(w=>({w,p:score(w.tags,state.tags).pct})).filter(x=>x.p>0).sort((a,b)=>b.p-a.p||b.w.likes-a.w.likes).map(x=>x.w);
 /* похожие: сравниваем с тегами открытой работы, саму работу исключаем */
 const similarWorks=id=>{const o=W[id];return WORKS.filter(w=>w.id!==id).map(w=>({w,p:score(w.tags,o.tags).pct})).filter(x=>x.p>=25).sort((a,b)=>b.p-a.p||b.w.likes-a.w.likes).slice(0,12).map(x=>x.w);};
 
@@ -583,7 +611,8 @@ const CONF={
   search:{hdr:'clear',step:3},
   feed:{hdr:'solid',step:4},
   work:{hdr:'solid',step:5},
-  master:{hdr:'clear',step:6}
+  master:{hdr:'clear',step:6},
+  saved:{hdr:'solid',step:0}
 };
 const R={};
 
@@ -643,11 +672,11 @@ R.search=el=>{
 };
 
 R.feed=el=>{
-  const list=feedWorks(), n=list.length, all=!state.tags.length;
+  const all=el.dataset.id==='all', list=feedWorks(all), n=list.length;
   el.innerHTML=`
   <h1 class="display" style="font-size:22px">${all?'Все работы':'Работы по твоему запросу'}</h1>
   <p class="sub">${all?`${n} ${plural(n,'работа','работы','работ')} · сначала самые популярные. Понравится что-то — открой и смотри похожие`:n?`${n} ${plural(n,'работа','работы','работ')} · сначала самые точные совпадения`:'Ничего не нашли. Убери пару тегов или замени их похожими'}</p>
-  <div class="tagrow"><button class="edit" type="button" data-act="back"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>${all?'Описать, что хочу':'Теги'}</button>${state.tags.map(id=>`<span class="chip sm hit">${T[id].name}</span>`).join('')}</div>
+  <div class="tagrow">${all?`<button class="edit" type="button" data-act="tab" data-tab="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>Описать, что хочу</button>`:`<button class="edit" type="button" data-act="back"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Теги</button>${state.tags.map(id=>`<span class="chip sm hit">${T[id].name}</span>`).join('')}`}</div>
   ${masonry(list)}`;
 };
 
@@ -668,6 +697,16 @@ R.work=el=>{
   </div>
   <h2 class="display h-sim">Похожие работы</h2>
   ${masonry(similarWorks(w.id))}`;
+};
+
+R.saved=el=>{
+  const seg=el.dataset.seg||'saved', ids=[...(seg==='saved'?saved:liked)].reverse(), list=ids.map(id=>W[id]).filter(Boolean);
+  el.innerHTML=`
+  <h1 class="display" style="font-size:24px">Сохранено</h1>
+  <p class="sub">Работы, к которым хочется вернуться</p>
+  <div class="seg" role="group"><button type="button" data-act="seg" data-seg="saved" aria-pressed="${seg==='saved'}">Сохранённые · ${saved.size}</button><button type="button" data-act="seg" data-seg="liked" aria-pressed="${seg==='liked'}">Нравится · ${liked.size}</button></div>
+  ${list.length?masonry(list):`<div class="empty-s">${seg==='saved'?'<svg viewBox="0 0 24 24"><path d="M6.5 4h11a1 1 0 0 1 1 1v15l-6.5-4.2L5.5 20V5a1 1 0 0 1 1-1z"/></svg><b>Пока ничего не сохранено</b>Открой работу и нажми «Сохранить», она появится здесь':heart.replace('<svg','<svg style="stroke:var(--coral-soft)"')+'<b>Пока нет лайков</b>Нажми на сердечко у работы, и она появится здесь'}
+    <button class="to-master" type="button" data-act="tab" data-tab="catalog">Открыть каталог</button></div>`}`;
 };
 
 R.master=el=>{
@@ -701,7 +740,9 @@ const mainbar=document.getElementById('mainbar'), mainbtn=document.getElementByI
 const tgLeft=document.getElementById('tgLeft');
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const DUR=reduce?0:360;
-let stack=[], busy=false, timers=[];
+let tabs={catalog:[],search:[],saved:[]}, tab='search', stack=tabs.search, busy=false, timers=[];
+const ROOT={search:['query'],catalog:['feed','all'],saved:['saved']};
+const tabbar=document.getElementById('tabbar');
 const later=(fn,ms)=>{const t=setTimeout(fn,ms);timers.push(t);return t;};
 const cur=()=>stack[stack.length-1];
 
@@ -725,6 +766,7 @@ function pop(){
   timers.forEach(clearTimeout);timers=[];
   const leaving=stack.pop(), prev=cur();
   if(prev.name==='tags')R.tags(prev.el);
+  if(prev.name==='saved')R.saved(prev.el);
   if(prev.name==='query'){prev.el.className='screen s-query leave-left';R.query(prev.el);}
   prev.el.hidden=false;prev.el.scrollTop=prev.scroll||0;prev.el.offsetWidth;prev.el.classList.remove('leave-left');
   leaving.el.classList.add("enter-right");
@@ -733,13 +775,45 @@ function pop(){
 }
 function restart(){
   timers.forEach(clearTimeout);timers=[];closeSheet(true);
-  view.innerHTML='';stack=[];busy=false;
+  view.innerHTML='';tabs={catalog:[],search:[],saved:[]};tab='search';stack=tabs.search;busy=false;
   Object.assign(state,{query:EXAMPLES[0].text,tags:[],ranges:[]});
-  const el=make('query');view.appendChild(el);stack.push({name:'query',el});sync();
+  openRoot('search');sync();
 }
+function openRoot(t){const [n,id]=ROOT[t];const el=make(n,id);view.appendChild(el);tabs[t].push({name:n,el});}
+/* у каждой вкладки своя история экранов и прокрутка */
+function switchTab(t){
+  if(busy)return;closeSheet(true);
+  if(t===tab){
+    if(stack.length>1){
+      stack.splice(1).forEach(x=>x.el.remove());
+      const r=stack[0];r.el.hidden=false;r.el.classList.remove('leave-left');
+      if(r.name==='saved')R.saved(r.el);
+      if(r.name==='query'){r.el.className='screen s-query';R.query(r.el);}
+      sync();
+    }else stack[0].el.scrollTo({top:0,behavior:'smooth'});
+    return;
+  }
+  if(timers.length){
+    timers.forEach(clearTimeout);timers=[];
+    const c=cur();
+    if(c.name==='search'){stack.pop();c.el.remove();const p=cur();p.el.hidden=false;p.el.classList.remove('leave-left');p.el.scrollTop=p.scroll||0;}
+    else if(c.name==='query'){c.el.className='screen s-query';R.query(c.el);}
+  }
+  const c=cur();c.scroll=c.el.scrollTop;c.el.hidden=true;
+  tab=t;stack=tabs[t];
+  if(!stack.length)openRoot(t);
+  const n=cur();n.el.hidden=false;n.el.classList.remove('leave-left','enter-right');
+  if(n.name==='saved')R.saved(n.el);
+  n.el.scrollTop=n.scroll||0;
+  sync();
+}
+function updCount(){const c=document.getElementById('savedCnt');c.textContent=saved.size;c.hidden=!saved.size;}
 function sync(){
   const c=CONF[cur().name];
   app.dataset.hdr=c.hdr;
+  const showTabs=!['tags','search'].includes(cur().name);
+  app.classList.toggle('with-tabs',showTabs);tabbar.classList.toggle('hide',!showTabs);
+  tabbar.querySelectorAll('.tab').forEach(b=>b.dataset.tab===tab?b.setAttribute('aria-current','page'):b.removeAttribute('aria-current'));
   tgLeft.innerHTML=stack.length>1?`<svg viewBox="0 0 11 18"><path d="M9 2L2 9l7 7"/></svg>Назад`:'Закрыть';
   document.querySelectorAll('#steps li').forEach(li=>{const n=+li.dataset.step;li.className=n===c.step?'on':n<c.step?'done':'';});
   if(tg){
@@ -793,7 +867,8 @@ function toggleSave(id){
   saved.has(id)?saved.delete(id):saved.add(id);store.set('saved',saved);
   const on=saved.has(id);
   document.querySelectorAll(`.savebtn[data-id="${id}"]`).forEach(b=>{b.setAttribute('aria-pressed',on);b.textContent=on?'Сохранено':'Сохранить';});
-  toast(on?'Работа сохранена':'Убрали из сохранённых');
+  updCount();
+  toast(on?'Работа сохранена во вкладку «Сохранено»':'Убрали из сохранённых');
 }
 
 /* шторка с тегами */
@@ -836,7 +911,9 @@ app.addEventListener('click',e=>{
   if(a==='example'){const ta=document.getElementById('q-input');ta.value=EXAMPLES[+b.dataset.i].text;ta.dispatchEvent(new Event('input'));}
   else if(a==='clear'){const ta=document.getElementById('q-input');ta.value='';ta.dispatchEvent(new Event('input'));ta.focus();}
   else if(a==='back')pop();
-  else if(a==='browse'){state.tags=[];state.ranges=[];push('feed');}
+  else if(a==='browse')switchTab('catalog');
+  else if(a==='tab')switchTab(b.dataset.tab);
+  else if(a==='seg'){const el=b.closest('.screen');el.dataset.seg=b.dataset.seg;R.saved(el);}
   else if(a==='remove'){state.tags=state.tags.filter(x=>x!==id);rerenderTags();}
   else if(a==='group')openSheet(b.dataset.g);
   else if(a==='add')openSheet();
@@ -874,6 +951,7 @@ function fit(){
   document.documentElement.style.setProperty('--s',s.toFixed(3));
 }
 addEventListener('resize',fit);fit();
+updCount();
 restart();
 </script>
 </body>
