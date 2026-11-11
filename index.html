@@ -115,6 +115,9 @@ button:focus-visible,textarea:focus-visible{outline:2px solid var(--coral);outli
 .q-text mark.on{background:var(--rose);color:var(--coral-deep)}
 .q-foot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:10px;margin-top:6px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 .q-foot button{color:var(--coral);font-weight:500}
+.browse{position:relative;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:48px;margin-top:12px;border-radius:999px;border:1.5px solid rgba(255,255,255,.75);color:var(--white);font-weight:600;font-size:15px;backdrop-filter:blur(6px)}
+.browse:hover{background:rgba(255,255,255,.18)}
+.browse svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2}
 .ex-label{position:relative;color:var(--white);font-size:13px;font-weight:500;margin:22px 4px 10px;opacity:.95}
 .examples{display:flex;flex-direction:column;gap:8px;position:relative}
 .ex{display:flex;align-items:center;gap:10px;text-align:left;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.45);color:var(--white);border-radius:18px;padding:11px 14px;font-size:14px;line-height:1.35;backdrop-filter:blur(6px)}
@@ -507,7 +510,7 @@ function score(tags,q){
   return{pct:tot?Math.round(got/tot*100):0,rows,got,tot};
 }
 /* лента: работы, отсортированные по совпадению с тегами запроса */
-const feedWorks=()=>WORKS.map(w=>({w,p:score(w.tags,state.tags).pct})).filter(x=>x.p>0).sort((a,b)=>b.p-a.p||b.w.likes-a.w.likes).map(x=>x.w);
+const feedWorks=()=>!state.tags.length?[...WORKS].sort((a,b)=>b.likes-a.likes):WORKS.map(w=>({w,p:score(w.tags,state.tags).pct})).filter(x=>x.p>0).sort((a,b)=>b.p-a.p||b.w.likes-a.w.likes).map(x=>x.w);
 /* похожие: сравниваем с тегами открытой работы, саму работу исключаем */
 const similarWorks=id=>{const o=W[id];return WORKS.filter(w=>w.id!==id).map(w=>({w,p:score(w.tags,o.tags).pct})).filter(x=>x.p>=25).sort((a,b)=>b.p-a.p||b.w.likes-a.w.likes).slice(0,12).map(x=>x.w);};
 
@@ -598,6 +601,7 @@ R.query=el=>{
     <div class="q-foot"><span id="q-count">${state.query.length} / 300</span><button type="button" data-act="clear">Очистить</button></div>
   </div>
   <div id="q-ex">
+    <button class="browse" type="button" data-act="browse"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="9" rx="2"/><rect x="13" y="4" width="7" height="5" rx="2"/><rect x="4" y="15" width="7" height="5" rx="2"/><rect x="13" y="11" width="7" height="9" rx="2"/></svg>Не знаю, что хочу — покажи всё</button>
     <p class="ex-label">Или начни с примера</p>
     <div class="examples">${EXAMPLES.map((e,i)=>`<button class="ex" type="button" data-act="example" data-i="${i}"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span><b>${e.label}.</b> ${esc(e.text)}</span></button>`).join('')}</div>
   </div>
@@ -639,11 +643,11 @@ R.search=el=>{
 };
 
 R.feed=el=>{
-  const list=feedWorks(), n=list.length;
+  const list=feedWorks(), n=list.length, all=!state.tags.length;
   el.innerHTML=`
-  <h1 class="display" style="font-size:22px">Работы по твоему запросу</h1>
-  <p class="sub">${n?`${n} ${plural(n,'работа','работы','работ')} · сначала самые точные совпадения`:'Ничего не нашли. Убери пару тегов или замени их похожими'}</p>
-  <div class="tagrow"><button class="edit" type="button" data-act="back"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Теги</button>${state.tags.map(id=>`<span class="chip sm hit">${T[id].name}</span>`).join('')}</div>
+  <h1 class="display" style="font-size:22px">${all?'Все работы':'Работы по твоему запросу'}</h1>
+  <p class="sub">${all?`${n} ${plural(n,'работа','работы','работ')} · сначала самые популярные. Понравится что-то — открой и смотри похожие`:n?`${n} ${plural(n,'работа','работы','работ')} · сначала самые точные совпадения`:'Ничего не нашли. Убери пару тегов или замени их похожими'}</p>
+  <div class="tagrow"><button class="edit" type="button" data-act="back"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>${all?'Описать, что хочу':'Теги'}</button>${state.tags.map(id=>`<span class="chip sm hit">${T[id].name}</span>`).join('')}</div>
   ${masonry(list)}`;
 };
 
@@ -832,6 +836,7 @@ app.addEventListener('click',e=>{
   if(a==='example'){const ta=document.getElementById('q-input');ta.value=EXAMPLES[+b.dataset.i].text;ta.dispatchEvent(new Event('input'));}
   else if(a==='clear'){const ta=document.getElementById('q-input');ta.value='';ta.dispatchEvent(new Event('input'));ta.focus();}
   else if(a==='back')pop();
+  else if(a==='browse'){state.tags=[];state.ranges=[];push('feed');}
   else if(a==='remove'){state.tags=state.tags.filter(x=>x!==id);rerenderTags();}
   else if(a==='group')openSheet(b.dataset.g);
   else if(a==='add')openSheet();
