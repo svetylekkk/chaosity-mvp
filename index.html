@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FF97A4">
+<title>Chaosity Mini App</title>
+<meta name="description" content="Прототип Telegram Mini App Chaosity: опиши маникюр словами, получи подборку работ и найди мастера.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=Montserrat:wght@700;800&display=swap">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+/* Layout: presentation panel on the left, iPhone frame with the Mini App on the right;
+   on phones and inside Telegram the app goes full-screen. Single light look, as in the Chaosity mockups. */
+:root{
+  --coral:#FF6F61;
+  --coral-deep:#EE5446;
+  --coral-soft:#FF9A8B;
+  --rose:#FFE4E4;
+  --blush:#FBF3F8;
+  --ink:#231B21;
+  --muted:#8E8590;
+  --line:#EFE4EC;
+  --white:#FFFFFF;
+  --stage:#F6EAF0;
+  --bezel:#141113;
+  --display:"Montserrat","Arial Black",system-ui,sans-serif;
+  --body:"Golos Text",-apple-system,"Segoe UI",Roboto,sans-serif;
+  --s:1;
+  --chrome-h:106px;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--stage);color:var(--ink);font-family:var(--body);font-size:14px;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent}
+button:focus-visible,textarea:focus-visible{outline:2px solid var(--coral);outline-offset:2px}
+[hidden]{display:none!important}
+
+/* ---------- stage ---------- */
+.stage{min-height:100%;display:flex;align-items:center;justify-content:center;gap:64px;padding-inline:24px;padding-block:20px}
+.panel{width:300px;display:flex;flex-direction:column;gap:22px}
+.panel .eyebrow{display:flex;align-items:center;gap:10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.panel .eyebrow svg{width:26px;height:26px;color:var(--coral)}
+.panel h1{font-family:var(--display);font-weight:800;font-size:26px;line-height:1.1;margin:0;text-transform:uppercase;text-wrap:balance}
+.panel p{margin:0;line-height:1.5;color:#5d5560;font-size:14px}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.steps li{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:12px;color:var(--muted);font-weight:500;font-size:14px;transition:background .2s,color .2s}
+.steps li b{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;background:var(--white);color:var(--muted);font-variant-numeric:tabular-nums}
+.steps li.done{color:var(--ink)}
+.steps li.done b{background:var(--rose);color:var(--coral)}
+.steps li.on{background:var(--white);color:var(--ink)}
+.steps li.on b{background:var(--coral);color:var(--white)}
+.tip{background:var(--white);border-radius:20px;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.tip h2{margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--coral);font-weight:600}
+.tip ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13px;line-height:1.45;color:#5d5560}
+.restart{align-self:flex-start;padding:10px 18px;border-radius:999px;border:1.5px solid var(--coral);color:var(--coral);font-weight:600;font-size:14px}
+.restart:hover{background:var(--coral);color:var(--white)}
+
+/* ---------- device ---------- */
+.device-wrap{width:calc(417px * var(--s));height:calc(876px * var(--s));position:relative;flex:none}
+.device{position:absolute;top:0;left:0;width:417px;height:876px;transform:scale(var(--s));transform-origin:0 0;border-radius:64px;background:var(--bezel);padding:12px;box-shadow:0 40px 80px -30px rgba(120,40,60,.45),inset 0 0 0 2px #2b2529}
+.app{position:relative;width:100%;height:100%;border-radius:52px;overflow:hidden;background:var(--blush);isolation:isolate}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:124px;height:36px;border-radius:20px;background:#000;z-index:30}
+.home-ind{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:136px;height:5px;border-radius:3px;background:var(--ink);opacity:.85;z-index:30;pointer-events:none}
+
+/* ---------- telegram chrome (имитация шапки Telegram) ---------- */
+.chrome{position:absolute;inset:0 0 auto 0;z-index:20;color:var(--ink);transition:background .3s,color .3s}
+.app[data-hdr="clear"] .chrome{color:var(--white)}
+.app[data-hdr="solid"] .chrome{background:rgba(251,243,248,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.statusbar{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 34px 0 46px;font-weight:600;font-size:16px}
+.statusbar svg{height:12px;fill:currentColor}
+.statusbar .sys{display:flex;gap:6px;align-items:center}
+.tgbar{height:52px;display:grid;grid-template-columns:96px 1fr 96px;align-items:center;padding:0 12px}
+.tg-left{justify-self:start;display:flex;align-items:center;gap:2px;font-size:16px;font-weight:500;padding:6px;border-radius:10px}
+.tg-left svg{width:11px;height:18px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.tg-title{text-align:center;line-height:1.15}
+.tg-title b{display:block;font-size:16px;font-weight:600}
+.tg-title span{font-size:12px;opacity:.7}
+.tg-more{justify-self:end;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.28)}
+.app[data-hdr="solid"] .tg-more{background:rgba(35,27,33,.06)}
+.tg-more svg{width:16px;fill:currentColor}
+
+/* ---------- screens ---------- */
+.viewport{position:absolute;inset:0;overflow:hidden}
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:calc(var(--chrome-h) + 8px) 16px 132px;background:var(--blush);transition:transform .36s cubic-bezier(.2,.8,.2,1),filter .36s;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.screen::-webkit-scrollbar{display:none}
+.screen.enter-right{transform:translateX(100%)}
+.screen.leave-left{transform:translateX(-26%);filter:brightness(.92)}
+.grad{background:
+  radial-gradient(55% 35% at 85% 4%,#FF8EAA 0%,transparent 70%),
+  radial-gradient(70% 40% at 0% 40%,#FF7566 0%,transparent 70%),
+  radial-gradient(60% 35% at 100% 62%,#FF6F61 0%,transparent 70%),
+  radial-gradient(85% 40% at 10% 100%,#FFC98B 0%,transparent 72%),
+  linear-gradient(180deg,#FF97A4 0%,#FF8574 50%,#FFB089 100%);
+  background-attachment:local}
+.grad::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.32;mix-blend-mode:soft-light;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+.display{font-family:var(--display);font-weight:800;text-transform:uppercase;letter-spacing:.01em;line-height:1.08;margin:0;text-wrap:balance}
+.sub{margin:6px 0 0;font-size:14px;line-height:1.45;color:var(--muted)}
+
+/* query */
+.hero{position:relative;text-align:center;color:var(--white);padding:6px 8px 20px}
+.brand{display:inline-flex;align-items:center;gap:8px;font-family:var(--display);font-weight:700;font-size:13px;letter-spacing:.14em;margin-bottom:14px}
+.brand svg{width:30px;height:30px}
+.hero h1{font-size:28px}
+.hero p{margin:10px auto 0;font-size:15px;line-height:1.45;max-width:31ch;opacity:.95}
+.q-card{position:relative;background:var(--white);border-radius:28px;padding:18px 18px 12px;box-shadow:0 20px 40px -24px rgba(170,40,40,.45)}
+.q-label{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--coral);margin-bottom:6px}
+.q-card textarea{width:100%;min-height:132px;border:0;resize:none;font:500 17px/1.45 var(--body);color:var(--ink);background:none;padding:0;outline:none}
+.q-card textarea::placeholder{color:#C3B9C1}
+.q-text{font:500 17px/1.6 var(--body);min-height:132px}
+.q-text mark{background:transparent;color:inherit;border-radius:6px;padding:1px 2px;margin:0 -2px;transition:background .3s,color .3s}
+.q-text mark.on{background:var(--rose);color:var(--coral-deep)}
+.q-foot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:10px;margin-top:6px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.q-foot button{color:var(--coral);font-weight:500}
+.ex-label{position:relative;color:var(--white);font-size:13px;font-weight:500;margin:22px 4px 10px;opacity:.95}
+.examples{display:flex;flex-direction:column;gap:8px;position:relative}
+.ex{display:flex;align-items:center;gap:10px;text-align:left;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.45);color:var(--white);border-radius:18px;padding:11px 14px;font-size:14px;line-height:1.35;backdrop-filter:blur(6px)}
+.ex:hover{background:rgba(255,255,255,.34)}
+.ex svg{flex:none;width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2}
+.found{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;position:relative}
+.found .chip{animation:pop .35s cubic-bezier(.3,1.5,.5,1) both}
+@keyframes pop{from{transform:scale(.6) translateY(8px);opacity:0}}
+
+/* chips */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:999px;font-size:14px;font-weight:500;background:var(--white);color:var(--coral);white-space:nowrap}
+.chip.solid{background:var(--coral);color:var(--white);padding-right:6px}
+.chip.solid .x{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.22)}
+.chip.solid .x svg{width:10px;height:10px;stroke:currentColor;stroke-width:2.4}
+.chip.add{border:1.5px dashed var(--coral-soft);background:transparent}
+.chip.sm{height:28px;padding:0 10px;font-size:12.5px}
+.chip.hit{background:var(--rose);color:var(--coral-deep)}
+.chip.near{background:#FFF1E4;color:#C46A2B}
+.chip.off{background:var(--white);border:1px solid var(--line);color:var(--muted)}
+
+/* tags */
+.block{background:var(--white);border-radius:24px;padding:16px}
+.block-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.cap{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.link{color:var(--coral);font-weight:500;font-size:14px}
+.quote{font-size:15px;line-height:1.55}
+.quote mark{background:var(--rose);color:var(--coral-deep);border-radius:5px;padding:0 2px}
+.stack{display:flex;flex-direction:column;gap:12px;margin-top:18px}
+.hint{font-size:13px;color:var(--muted);line-height:1.4;margin:12px 2px 0}
+.empty{font-size:14px;line-height:1.5;color:var(--ink);background:#FFF1E4;border-radius:16px;padding:12px 14px;margin-bottom:12px}
+
+/* search */
+.search{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--white);gap:18px;position:relative;padding-bottom:40px}
+.orbit{width:120px;height:120px;color:var(--white);animation:spin 2.4s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.search h1{font-size:24px;max-width:12em}
+.checks{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;width:100%;max-width:280px}
+.checks li{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.22);border-radius:14px;padding:9px 12px;font-size:14px;font-weight:500;text-align:left;opacity:0;transform:translateY(6px);transition:opacity .3s,transform .3s}
+.checks li.on{opacity:1;transform:none}
+.checks li i{width:20px;height:20px;border-radius:50%;background:var(--white);color:var(--coral);display:grid;place-items:center;flex:none;font-style:normal;font-size:12px;font-weight:700}
+
+/* feed (Pinterest-сетка) */
+.tagrow{display:flex;gap:6px;overflow-x:auto;margin:14px -16px 0;padding:0 16px 2px;scrollbar-width:none;align-items:center}
+.tagrow::-webkit-scrollbar{display:none}
+.tagrow .edit{flex:none;height:28px;padding:0 12px;border-radius:999px;background:var(--coral);color:var(--white);font-size:12.5px;font-weight:500;display:inline-flex;align-items:center;gap:6px}
+.tagrow .edit svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2.2}
+.masonry{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;align-items:start}
+.masonry .col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.pin{display:block;width:100%;text-align:left}
+.pin svg,.pin img{display:block;width:100%;height:auto;border-radius:18px;background:var(--line)}
+.pin:active svg{transform:scale(.98)}
+.pin-cap{display:flex;align-items:center;gap:6px;margin-top:6px;padding:0 2px;font-size:12.5px;color:var(--muted);font-weight:500}
+.pin-cap i{width:16px;height:16px;border-radius:6px;flex:none}
+.pin-cap .liked{margin-left:auto;color:var(--coral)}
+
+/* work */
+.s-work{padding-left:10px;padding-right:10px}
+.w-img svg,.w-img img{display:block;width:100%;height:auto;border-radius:28px}
+.w-bar{display:flex;align-items:center;gap:8px;margin:12px 4px 0}
+.likebtn{display:inline-flex;align-items:center;gap:6px;height:44px;padding:0 12px;border-radius:999px;font-weight:600;font-size:15px;font-variant-numeric:tabular-nums}
+.likebtn svg{width:26px;height:26px;stroke:var(--ink);stroke-width:1.8;fill:none;transition:transform .2s}
+.likebtn[aria-pressed="true"] svg{fill:var(--coral);stroke:var(--coral);transform:scale(1.08)}
+.savebtn{margin-left:auto;height:44px;padding:0 20px;border-radius:999px;background:var(--coral);color:var(--white);font-weight:600;font-size:15px;transition:background .2s,color .2s}
+.savebtn[aria-pressed="true"]{background:var(--ink);color:var(--white)}
+.w-body{padding:6px 6px 0;display:flex;flex-direction:column;gap:12px}
+.w-body h1{font-size:21px}
+.author{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--white);border-radius:20px;padding:10px 14px 10px 10px}
+.author .ava{width:48px;height:48px;font-size:15px;border-radius:16px;flex:none}
+.author b{display:block;font-size:15px;font-weight:600}
+.author small{display:block;font-size:12.5px;color:var(--muted);margin-top:1px}
+.author .chev{margin-left:auto;width:9px;height:15px;stroke:var(--muted);fill:none;stroke-width:2.2;flex:none}
+.to-master{width:100%;height:50px;border-radius:999px;border:1.5px solid var(--coral);color:var(--coral);font-weight:600;font-size:15px}
+.to-master:hover{background:var(--coral);color:var(--white)}
+.h-sim{font-size:18px;margin:28px 6px 0}
+.s-work .masonry{margin-top:12px}
+
+/* master profile */
+.ava{border-radius:22px;display:grid;place-items:center;color:var(--white);font-family:var(--display);font-weight:800;position:relative;overflow:hidden}
+.ava::after{content:"";position:absolute;inset:-30%;background:repeating-radial-gradient(circle at 70% 20%,rgba(255,255,255,.18) 0 2px,transparent 2px 12px)}
+.ava span{position:relative;z-index:1}
+.c-spec{font-size:13px;line-height:1.35;color:var(--muted)}
+.s-master{padding-top:0}
+.cover{height:206px;margin:0 -16px;position:relative;overflow:hidden}
+.cover svg{position:absolute;inset:0;width:100%;height:100%}
+.cover::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(35,27,33,.55) 0%,rgba(35,27,33,0) 60%)}
+.p-head{display:flex;flex-direction:column;align-items:center;text-align:center;margin-top:-52px;position:relative}
+.p-head .ava{width:104px;height:104px;font-size:32px;border-radius:32px;box-shadow:0 0 0 5px var(--blush)}
+.p-head h1{font-size:23px;margin-top:14px}
+.p-head .c-spec{font-size:14px;margin-top:6px;max-width:30ch}
+.facts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+.fact{display:inline-flex;align-items:center;gap:6px;background:var(--white);border-radius:999px;padding:7px 12px;font-size:13px;color:var(--ink)}
+.fact svg{width:14px;height:14px;stroke:var(--coral);fill:none;stroke-width:1.8}
+.ring{--p:0;--c:var(--coral);border-radius:50%;background:conic-gradient(var(--c) calc(var(--p)*1%),var(--rose) 0);display:grid;place-items:center;width:76px;height:76px}
+.ring b{width:62px;height:62px;border-radius:50%;background:var(--white);display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:19px;color:var(--c);font-variant-numeric:tabular-nums}
+.match{display:grid;grid-template-columns:76px 1fr;gap:14px;align-items:center}
+.match h2{font-family:var(--display);font-weight:800;font-size:16px;text-transform:uppercase;margin:0;line-height:1.2}
+.match p{margin:4px 0 0;font-size:13px;color:var(--muted);line-height:1.4}
+.rows{list-style:none;margin:14px 0 0;padding:0;border-top:1px solid var(--line)}
+.rows li{display:grid;grid-template-columns:24px 1fr auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+.rows li:last-child{border-bottom:0}
+.rows i{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:12px;font-weight:700}
+.rows .yes i{background:var(--coral);color:var(--white)}
+.rows .near i{background:#FFE2C8;color:#C46A2B}
+.rows .no i{background:var(--line);color:var(--muted)}
+.rows small{display:block;color:var(--muted);font-size:12px;margin-top:1px}
+.rows em{font-style:normal;font-weight:600;font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted)}
+.rows .yes em{color:var(--coral)}
+.rows .near em{color:#C46A2B}
+.formula{font-size:12px;color:var(--muted);line-height:1.45;margin:10px 0 0}
+.about{margin:0;font-size:15px;line-height:1.55}
+.works{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.works button svg{width:100%;aspect-ratio:1;border-radius:16px;display:block}
+
+/* main button */
+.mainbar{position:absolute;left:0;right:0;bottom:0;z-index:15;padding:22px 16px 30px;pointer-events:none;transition:opacity .25s}
+.app[data-hdr="solid"] .mainbar{background:linear-gradient(to top,var(--blush) 62%,rgba(251,243,248,0))}
+.mainbtn{pointer-events:auto;width:100%;height:52px;border-radius:999px;background:var(--coral);color:var(--white);font-size:17px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 12px 26px -14px rgba(238,84,70,.9);transition:background .2s,opacity .2s}
+.app[data-hdr="clear"] .mainbtn{background:var(--white);color:var(--coral);box-shadow:0 12px 26px -14px rgba(150,30,30,.5)}
+.mainbtn:disabled{opacity:.5;cursor:default}
+.mainbtn .spin{width:18px;height:18px;border-radius:50%;border:2.5px solid currentColor;border-right-color:transparent;animation:spin .8s linear infinite}
+.mainbar.hide{opacity:0}
+.mainbar.hide .mainbtn{pointer-events:none}
+
+/* sheet */
+.backdrop{position:absolute;inset:0;background:rgba(35,27,33,.35);z-index:40;opacity:0;transition:opacity .25s}
+.backdrop.on{opacity:1}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:41;background:var(--white);border-radius:28px 28px 0 0;max-height:74%;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .32s cubic-bezier(.2,.8,.2,1)}
+.sheet.on{transform:none}
+.sheet .grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:10px auto 4px}
+.sheet-h{padding:8px 20px 4px}
+.sheet-h h2{font-family:var(--display);font-weight:800;font-size:18px;text-transform:uppercase;margin:0}
+.sheet-h p{margin:4px 0 0;font-size:13px;color:var(--muted)}
+.sheet-body{overflow-y:auto;padding:8px 20px 12px;display:flex;flex-direction:column;gap:16px}
+.grp .cap{margin-bottom:8px;display:block}
+.grp .chip{background:var(--blush);color:var(--ink)}
+.grp .chip[aria-pressed="true"]{background:var(--coral);color:var(--white)}
+.sheet-foot{padding:10px 16px 30px}
+.sheet-foot .mainbtn{box-shadow:none}
+
+/* toast */
+.toast{position:absolute;left:16px;right:16px;top:calc(var(--chrome-h) + 8px);z-index:50;background:rgba(35,27,33,.92);color:var(--white);border-radius:16px;padding:12px 14px;font-size:14px;line-height:1.4;transform:translateY(-12px);opacity:0;transition:.25s;pointer-events:none}
+.toast.on{transform:none;opacity:1}
+
+@media (max-width:980px){.panel{display:none}}
+@media (max-width:520px){
+  .stage{padding:0;display:block;height:100%}
+  .device-wrap{width:100%;height:100%}
+  .device{position:static;width:100%;height:100%;transform:none;padding:0;border-radius:0;background:none;box-shadow:none}
+  .app{border-radius:0}
+  .island,.home-ind,.statusbar{display:none}
+  :root{--chrome-h:52px}
+  .mainbar{padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+}
+/* внутри настоящего Telegram шапку рисует сам Telegram */
+:root.in-tg{--chrome-h:0px}
+.in-tg .chrome,.in-tg .panel{display:none}
+@media (prefers-reduced-motion:reduce){
+  .screen,.sheet,.backdrop,.toast,.checks li,.q-text mark{transition:none}
+  .orbit,.found .chip{animation:none}
+}
+</style>
+</head>
+<body>
+<div class="stage">
+  <aside class="panel" aria-label="Сценарий прототипа">
+    <div class="eyebrow"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#logo"/></svg>Chaosity · Telegram Mini App</div>
+    <h1>Маникюр по описанию</h1>
+    <p>Клиент пишет запрос своими словами, система раскладывает его на теги и подбирает фотографии работ. Понравившаяся работа ведёт к её мастеру.</p>
+    <ol class="steps" id="steps">
+      <li data-step="1"><b>1</b>Запрос своими словами</li>
+      <li data-step="2"><b>2</b>Теги и их правка</li>
+      <li data-step="3"><b>3</b>Поиск работ</li>
+      <li data-step="4"><b>4</b>Лента работ</li>
+      <li data-step="5"><b>5</b>Работа и похожие</li>
+      <li data-step="6"><b>6</b>Профиль мастера</li>
+    </ol>
+    <div class="tip">
+      <h2>Что проверить</h2>
+      <ul>
+        <li>Убери тег «Альтернативный стиль»: порядок работ в ленте изменится.</li>
+        <li>Открой работу, поставь лайк и сохрани её, затем пройди по похожим работам и вернись назад.</li>
+        <li>Напиши свой запрос, например «синий кошачий глаз на длинных миндалях».</li>
+      </ul>
+    </div>
+    <button class="restart" id="restart" type="button">Начать заново</button>
+  </aside>
+
+  <div class="device-wrap" id="devwrap">
+    <div class="device">
+      <div class="app" id="app" data-hdr="clear">
+        <div class="island"></div>
+        <div class="viewport" id="viewport"></div>
+        <header class="chrome">
+          <div class="statusbar"><span>9:41</span><span class="sys">
+            <svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+            <svg viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.2 2.5l1.3-1.3A10.6 10.6 0 0 0 8 .3 10.6 10.6 0 0 0 .5 3.4l1.3 1.3A8.8 8.8 0 0 1 8 2.2zm0 3.7c1.4 0 2.7.5 3.6 1.4l1.3-1.3A7 7 0 0 0 8 4a7 7 0 0 0-4.9 2l1.3 1.3c1-.9 2.2-1.4 3.6-1.4zM8 9.5a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6z"/></svg>
+            <svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".5"/><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="25" y="4" width="1.6" height="4" rx=".8" opacity=".5"/></svg>
+          </span></div>
+          <div class="tgbar">
+            <button class="tg-left" id="tgLeft" type="button"></button>
+            <div class="tg-title"><b>Chaosity</b><span>мини-приложение</span></div>
+            <button class="tg-more" id="tgMore" type="button" aria-label="Меню"><svg viewBox="0 0 16 4"><circle cx="2" cy="2" r="1.7"/><circle cx="8" cy="2" r="1.7"/><circle cx="14" cy="2" r="1.7"/></svg></button>
+          </div>
+        </header>
+        <div class="mainbar" id="mainbar"><button class="mainbtn" id="mainbtn" type="button"></button></div>
+        <div class="toast" id="toast" role="status"></div>
+        <div class="home-ind"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="logo" viewBox="0 0 64 64">
+    <g fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round">
+      <ellipse cx="31" cy="35" rx="25" ry="9" transform="rotate(-32 31 35)"/>
+      <ellipse cx="31" cy="35" rx="25" ry="9" transform="rotate(32 31 35)"/>
+      <path d="M22 13c7 4 12 12 14 22"/>
+    </g>
+    <circle cx="31" cy="35" r="4.5" fill="currentColor"/>
+    <path d="M46 6c7-1 11 3 11 9-7 1-11-3-11-9z" fill="currentColor"/>
+  </symbol>
+</svg>
+
+<script>
+/* ================= теги ================= */
+const GROUPS={
+  style:{name:'Стиль',w:4},
+  len:{name:'Длина',w:2,ex:true},
+  shape:{name:'Форма',w:2,ex:true},
+  design:{name:'Дизайн',w:2},
+  color:{name:'Цвет',w:1},
+  approach:{name:'Подход',w:1},
+  tech:{name:'Техника',w:1}
+};
+const TAGS=[
+  {id:'alt',g:'style',name:'Альтернативный стиль',stems:['альт','неформ','готик','готичн','панк','гранж','рок']},
+  {id:'y2k',g:'style',name:'Y2K-эстетика',stems:['y2k','нулев','двухтысяч']},
+  {id:'tender',g:'style',name:'Нежный стиль',stems:['нежн','мил','пастел','романтич']},
+  {id:'minimal',g:'style',name:'Минимализм',stems:['минимал','лаконич','аккуратн','сдержан']},
+  {id:'short',g:'len',name:'Короткие ногти',stems:['коротк']},
+  {id:'mid',g:'len',name:'Средняя длина',stems:['средн']},
+  {id:'long',g:'len',name:'Длинные ногти',stems:['длинн','удлин','экстрадлин']},
+  {id:'almond',g:'shape',name:'Миндальная форма',stems:['миндал']},
+  {id:'oval',g:'shape',name:'Овальная форма',stems:['овал']},
+  {id:'square',g:'shape',name:'Квадратная форма',stems:['квадрат']},
+  {id:'stiletto',g:'shape',name:'Форма «стилет»',stems:['стилет','остр']},
+  {id:'complex',g:'design',name:'Сложный дизайн',stems:['необычн','сложн','арт','роспис','рисун','3d','объемн']},
+  {id:'decor',g:'design',name:'Стразы и декор',stems:['страз','кристал','блест','декор','цеп','бусин','звезд','бабоч']},
+  {id:'chrome',g:'design',name:'Хром и металлик',stems:['хром','металлик','зеркал','перламутр']},
+  {id:'cateye',g:'design',name:'Кошачий глаз',stems:['кошач','кошк']},
+  {id:'french',g:'design',name:'Френч',stems:['френч']},
+  {id:'solid',g:'design',name:'Однотонное покрытие',stems:['однотон','монохром']},
+  {id:'c_black',g:'color',name:'Чёрный',stems:['черн']},
+  {id:'c_nude',g:'color',name:'Нюд',stems:['нюд','бежев','телесн','молочн']},
+  {id:'c_pink',g:'color',name:'Розовый',stems:['розов']},
+  {id:'c_red',g:'color',name:'Красный',stems:['красн','бордо','вишн']},
+  {id:'c_blue',g:'color',name:'Синий и голубой',stems:['син','голуб']},
+  {id:'c_purple',g:'color',name:'Фиолетовый',stems:['фиолет','сирен','лаванд']},
+  {id:'c_silver',g:'color',name:'Серебро',stems:['серебр']},
+  {id:'nonstd',g:'approach',name:'Нестандартный маникюр',stems:['необычн','нестандарт','странн','хаос','креатив','дерзк','безумн']},
+  {id:'classic',g:'approach',name:'Классический маникюр',stems:['классич','классик']},
+  {id:'ext',g:'tech',name:'Наращивание',stems:['наращ','нарастить']},
+  {id:'pierce',g:'tech',name:'Пирсинг ногтей',stems:['пирсинг']}
+];
+const T=Object.fromEntries(TAGS.map(t=>[t.id,t]));
+/* похожие характеристики дают половину балла */
+const RELATED=[['almond','oval'],['almond','stiletto'],['long','mid'],['short','mid'],['alt','y2k'],['complex','decor'],['complex','chrome'],['minimal','solid'],['chrome','cateye'],['c_blue','c_purple'],['c_silver','chrome'],['c_pink','c_red']];
+const related=id=>RELATED.filter(p=>p.includes(id)).map(p=>p[0]===id?p[1]:p[0]);
+
+/* ================= мастера ================= */
+const MASTERS=[
+  {id:'masha',name:'Маша Энтропова',ini:'МЭ',spec:'Альт-маникюр, наращивание и 3D-декор',addr:'Маросейка, 9 · м. Китай-город',exp:'6 лет опыта',
+   about:'Делаю длинные миндали в альтернативной эстетике: цепи, шипы, пирсинг ногтей, объёмный декор. Приходи с самой странной идеей, вместе превратим её в ногти, на которые оборачиваются в метро.',
+   focus:'Наращивание длинных ногтей и сложный альтернативный дизайн',
+   tags:['alt','long','almond','complex','nonstd','ext','pierce','decor'],skin:'#F0C6AE',av:['#2B1E2A','#FF6F61']},
+  {id:'alina',name:'Алина Вихрева',ini:'АВ',spec:'Ручная роспись и креативные дизайны на стилетах',addr:'ул. Эриды, 12',exp:'4 года опыта',
+   about:'Рисую всё, что придумаешь: хромовые языки пламени, глитч, мини-комиксы на каждом ногте. Чаще всего работаю с острой формой, на стилетах роспись смотрится эффектнее.',
+   focus:'Сложная роспись, хром и длинные стилеты',
+   tags:['alt','long','stiletto','complex','nonstd','chrome','decor'],skin:'#E2B094',av:['#7B3FE4','#FF8FA3']},
+  {id:'katya',name:'Катя Глитчева',ini:'КГ',spec:'Тёмный минимализм и графика на коротких ногтях',addr:'пр. Металлика, 13',exp:'3 года опыта',
+   about:'Альтернатива без лишнего: короткая длина, чёрный и графит, тонкие линии и негативное пространство. Такой маникюр носится три недели и не мешает играть на гитаре.',
+   focus:'Короткие ногти и графичный минимализм',
+   tags:['alt','short','almond','minimal','nonstd','solid'],skin:'#F4D2BD',av:['#1F1A1D','#8E8590']},
+  {id:'nastya',name:'Настя Сумбурова',ini:'НС',spec:'Классика, френч и нежные дизайны',addr:'Чистопрудный бульвар, 4',exp:'8 лет опыта',
+   about:'Моя база — идеальное покрытие и аккуратная форма. Чаще делаю классику и френч, но иногда берусь за нестандартные дизайны: стразы, неожиданные цвета, пара акцентных ногтей.',
+   focus:'Классический маникюр и аккуратное покрытие',
+   tags:['classic','long','almond','tender','french','decor','nonstd'],skin:'#F3CDB6',av:['#FFB3C4','#FFD9B8']},
+  {id:'kris',name:'Крис Апсетова',ini:'КА',spec:'Y2K, хромовая пудра и стразы',addr:'бульвар Хаоса, 40',exp:'5 лет опыта',
+   about:'Нулевые никогда не заканчивались. Хромовая пудра, стразы, бабочки и голубой лёд на квадратах средней длины. Наращиваю, если своей длины не хватает.',
+   focus:'Y2K-эстетика, хром и стразы',
+   tags:['y2k','mid','square','chrome','decor','ext'],skin:'#EFC2A6',av:['#6CC6FF','#D79BFF']}
+];
+const M=Object.fromEntries(MASTERS.map(m=>[m.id,m]));
+
+/* ================= работы =================
+   img: путь к настоящей фотографии (например 'images/m1.jpg'). Пока пусто — рисуется заглушка. */
+const WORKS=[
+  {id:'m1',m:'masha',t:'Цепи и пирсинг',d:'Длинные чёрные миндали с серебряными цепочками и кольцом пирсинга на безымянном.',tags:['alt','long','almond','complex','nonstd','decor','pierce','c_black'],shape:'almond',len:'long',c:['#0E0E10','#4A4752'],bg:'#2A2329',deco:'chain',r:1.45,likes:214},
+  {id:'m2',m:'masha',t:'Чёрный хром с каплями',d:'Глубокий чёрный под зеркальным топом и объёмные серебряные капли, как застывший металл.',tags:['alt','long','almond','chrome','complex','nonstd','c_black','c_silver','ext'],shape:'almond',len:'long',c:['#1A1A1E','#55535C'],bg:'#E8E2EC',deco:'drops',r:1.2,likes:187},
+  {id:'m3',m:'masha',t:'Вишнёвая графика',d:'Глянцевая вишня с тонкими диагональными линиями. Дерзко, но собранно.',tags:['alt','long','almond','complex','c_red'],shape:'almond',len:'long',c:['#B0122B','#2A0A10'],bg:'#1F1A1D',deco:'lines',r:1.6,likes:96},
+  {id:'m4',m:'masha',t:'Коралловый хаос',d:'Коралловый градиент в чёрный, россыпь страз на каждом ногте. Фирменный цвет студии.',tags:['alt','long','almond','complex','nonstd','decor','c_pink'],shape:'almond',len:'long',c:['#FF6F61','#1C1418'],bg:'#FFE1DA',deco:'dots',r:1.05,likes:143},
+  {id:'m5',m:'masha',t:'Серебряный 3D на нюде',d:'Прозрачный нюд и ручная лепка серебряных капель гелем. Наращивание до длинного миндаля.',tags:['alt','long','almond','chrome','complex','nonstd','c_silver','c_nude','ext'],shape:'almond',len:'long',c:['#F2D9D0','#E3BFB3'],bg:'#F7EEF2',deco:'drops',r:1.35,likes:322},
+
+  {id:'a1',m:'alina',t:'Фиолетовое пламя',d:'Хромовые языки пламени поверх фиолетового на длинных стилетах. Роспись вручную.',tags:['alt','long','stiletto','complex','nonstd','chrome','c_purple'],shape:'stiletto',len:'long',c:['#B98CFF','#4B1FA0'],bg:'#EDE3FF',deco:'chrome',r:1.5,likes:276},
+  {id:'a2',m:'alina',t:'Кислотный глитч',d:'Неоновый лайм с чёрными полосами, будто картинка сломалась. Для тех, кто не боится внимания.',tags:['alt','long','stiletto','complex','nonstd','c_black'],shape:'stiletto',len:'long',c:['#C6FF4A','#3E7A00'],bg:'#1D1A22',deco:'lines',r:1.15,likes:118},
+  {id:'a3',m:'alina',t:'Кошачий глаз «аврора»',d:'Синий магнитный гель с полосой света посередине. На свету переливается, как северное сияние.',tags:['long','stiletto','cateye','complex','c_blue'],shape:'stiletto',len:'long',c:['#2B3A8F','#121A45'],glow:'#9FB8FF',bg:'#DCE4F7',deco:'cateye',r:1.4,likes:401},
+  {id:'a4',m:'alina',t:'Звёздная ночь',d:'Синий кошачий глаз, прозрачные акценты и серебряные звёзды. Длинный миндаль вместо привычного стилета.',tags:['long','almond','cateye','chrome','complex','decor','c_blue','c_silver'],shape:'almond',len:'long',c:['#4256B8','#1B2260'],glow:'#C9D4FF',bg:'#202542',deco:'stars',r:1.25,likes:358},
+  {id:'a5',m:'alina',t:'Розовые молнии',d:'Ярко-розовые стилеты с белыми молниями в стиле нулевых.',tags:['y2k','long','stiletto','complex','nonstd','c_pink'],shape:'stiletto',len:'long',c:['#FF5FA2','#C2185B'],bg:'#FFE4EE',deco:'lines',r:1.0,likes:84},
+
+  {id:'k1',m:'katya',t:'Чёрный матовый',d:'Короткий миндаль, плотный матовый чёрный. Ничего лишнего.',tags:['alt','short','almond','minimal','solid','c_black'],shape:'almond',len:'short',c:['#151216','#2A262B'],bg:'#EDE7EA',deco:'none',r:1.0,likes:167},
+  {id:'k2',m:'katya',t:'Тонкая графика',d:'Молочная база и тонкие чёрные линии. Графика, которая видна только вблизи.',tags:['alt','short','almond','minimal','nonstd','c_nude','c_black'],shape:'almond',len:'short',c:['#F7F1F3','#E9E1E5'],bg:'#D9CFD4',deco:'lines',r:1.3,likes:92},
+  {id:'k3',m:'katya',t:'Бордо',d:'Однотонное бордо на коротком миндале. Осенняя классика в тёмном прочтении.',tags:['short','almond','minimal','solid','c_red'],shape:'almond',len:'short',c:['#5A2330','#2A0E15'],bg:'#2A2329',deco:'none',r:1.1,likes:75},
+  {id:'k4',m:'katya',t:'Точки на графите',d:'Графитовые квадраты с одной белой точкой. Минимализм с характером.',tags:['alt','short','square','minimal','nonstd','c_black'],shape:'square',len:'short',c:['#2E2A30','#2E2A30'],bg:'#E9E4EC',deco:'dots',r:1.45,likes:58},
+  {id:'k5',m:'katya',t:'Молочный минимализм',d:'Полупрозрачное молочное покрытие на короткий овал. Аккуратно и нежно.',tags:['short','oval','minimal','tender','solid','c_nude'],shape:'oval',len:'short',c:['#FAF3EF','#EFE2DC'],bg:'#CDBFC6',deco:'none',r:1.2,likes:131},
+
+  {id:'n1',m:'nastya',t:'Классический френч',d:'Нюдовая база и тонкая белая линия улыбки на длинном миндале.',tags:['classic','long','almond','french','tender','c_nude'],shape:'almond',len:'long',c:['#F6D3CC','#EDBDB3'],bg:'#FFF1EC',deco:'french',r:1.35,likes:245},
+  {id:'n2',m:'nastya',t:'Перламутровый нюд',d:'Глазированный нюд с перламутровой втиркой. Самый частый запрос сезона.',tags:['classic','long','almond','tender','chrome','c_nude'],shape:'almond',len:'long',c:['#F3D6CF','#E2B9AE'],bg:'#ECE3E0',deco:'chrome',r:1.6,likes:512},
+  {id:'n3',m:'nastya',t:'Розовые стразы',d:'Пудровый розовый и дорожка мелких страз. Нежно, но с блеском.',tags:['tender','long','almond','decor','nonstd','c_pink'],shape:'almond',len:'long',c:['#FFC3D2','#FFA3B9'],bg:'#FDE7EE',deco:'dots',r:1.1,likes:188},
+  {id:'n4',m:'nastya',t:'Красная классика',d:'Насыщенный красный на овале средней длины. Идеальное покрытие без бликов.',tags:['classic','mid','oval','solid','c_red'],shape:'oval',len:'mid',c:['#E3283E','#A8102A'],bg:'#FFF3E8',deco:'none',r:1.25,likes:139},
+  {id:'n5',m:'nastya',t:'Лавандовый френч',d:'Цветной френч в лавандовом оттенке на миндале средней длины.',tags:['tender','mid','almond','french','c_purple'],shape:'almond',len:'mid',c:['#F1E6F7','#E3D3EE'],tip:'#B79BE0',bg:'#F4ECF8',deco:'french',r:1.0,likes:97},
+
+  {id:'r1',m:'kris',t:'Голубой лёд',d:'Голубая хромовая пудра на квадратах средней длины. Холодно и блестяще.',tags:['y2k','mid','square','chrome','c_blue','ext'],shape:'square',len:'mid',c:['#BFE6FF','#6CC6FF'],bg:'#E3F4FF',deco:'chrome',r:1.3,likes:203},
+  {id:'r2',m:'kris',t:'Розовые стразы Y2K',d:'Бабблгам-розовый и крупные стразы. Привет из 2004-го.',tags:['y2k','mid','square','decor','nonstd','c_pink'],shape:'square',len:'mid',c:['#FF9CC7','#FF5FA2'],bg:'#FFE8F1',deco:'dots',r:1.5,likes:154},
+  {id:'r3',m:'kris',t:'Серебряная пудра',d:'Зеркальное серебро на квадратах. Ногти как ёлочная игрушка.',tags:['y2k','mid','square','chrome','c_silver'],shape:'square',len:'mid',c:['#E7EBF0','#9AA3AE'],bg:'#2B2A33',deco:'chrome',r:1.1,likes:121},
+  {id:'r4',m:'kris',t:'Сиреневый хром',d:'Сиреневая пудра с переливом в голубой и пара страз на акцентных ногтях.',tags:['y2k','mid','square','chrome','decor','c_purple','c_blue'],shape:'square',len:'mid',c:['#C9B3FF','#7FA8FF'],bg:'#F1E9FF',deco:'chrome',r:1.4,likes:176},
+  {id:'r5',m:'kris',t:'Бабочки и звёзды',d:'Длинные квадраты, голубой градиент и серебряные звёздочки. Наращивание.',tags:['y2k','long','square','complex','decor','nonstd','c_blue','ext'],shape:'square',len:'long',c:['#9BD8FF','#5F8BFF'],bg:'#E8F2FF',deco:'stars',r:1.2,likes:99}
+];
+const W=Object.fromEntries(WORKS.map(w=>[w.id,w]));
+
+const EXAMPLES=[
+  {label:'Альтушка с Китай-города',text:'Хочу длинные ногти миндальной формы, с необычным дизайном в стиле альтушки с Китай-города'},
+  {label:'Нежный минимализм',text:'Нужен короткий аккуратный маникюр, что-то минималистичное и нежное'},
+  {label:'Синяя аврора',text:'Синий кошачий глаз на длинных миндалях, можно со звёздами'}
+];
+
+/* ================= лайки и сохранения (localStorage) ================= */
+const store={
+  get(k){try{return new Set(JSON.parse(localStorage.getItem('chaosity.'+k)||'[]'));}catch(e){return new Set();}},
+  set(k,s){try{localStorage.setItem('chaosity.'+k,JSON.stringify([...s]));}catch(e){}}
+};
+const liked=store.get('likes'), saved=store.get('saved');
+
+/* ================= логика ================= */
+const state={query:EXAMPLES[0].text,tags:[],ranges:[]};
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const isL=c=>c&&/[a-zа-яё0-9]/i.test(c);
+
+function extract(text){
+  const low=text.toLowerCase().replace(/ё/g,'е');
+  const hits=[];
+  for(const t of TAGS){
+    let best=null;
+    for(const s of t.stems){
+      let from=0,i;
+      while((i=low.indexOf(s,from))!==-1){
+        if(!isL(low[i-1])){ if(best===null||i<best.i){let e=i;while(isL(low[e]))e++;best={i,e};} break;}
+        from=i+1;
+      }
+    }
+    if(best) hits.push({id:t.id,g:t.g,...best});
+  }
+  hits.sort((a,b)=>a.i-b.i);
+  const used={},tags=[],ranges=[];
+  for(const h of hits){
+    if(GROUPS[h.g].ex&&used[h.g])continue;
+    used[h.g]=1;tags.push(h.id);ranges.push([h.i,h.e]);
+  }
+  ranges.sort((a,b)=>a[0]-b[0]);
+  const merged=[];
+  for(const r of ranges){const l=merged[merged.length-1];if(l&&r[0]<=l[1])l[1]=Math.max(l[1],r[1]);else merged.push([...r]);}
+  return {tags,ranges:merged};
+}
+function marked(text,ranges){
+  let out='',p=0;
+  ranges.forEach(([a,b],k)=>{out+=esc(text.slice(p,a))+`<mark data-k="${k}">${esc(text.slice(a,b))}</mark>`;p=b;});
+  return out+esc(text.slice(p));
+}
+/* сколько тегов запроса q есть в наборе tags: точное совпадение = вес тега, похожее = половина */
+function score(tags,q){
+  let tot=0,got=0;
+  const rows=q.map(id=>{
+    const w=GROUPS[T[id].g].w;tot+=w;
+    if(tags.includes(id)){got+=w;return{id,kind:'yes',pts:w,w};}
+    const r=related(id).find(x=>tags.includes(x));
+    if(r){got+=w/2;return{id,kind:'near',via:r,pts:w/2,w};}
+    return{id,kind:'no',pts:0,w};
+  });
+  return{pct:tot?Math.round(got/tot*100):0,rows,got,tot};
+}
+/* лента: работы, отсортированные по совпадению с тегами запроса */
+const feedWorks=()=>WORKS.map(w=>({w,p:score(w.tags,state.tags).pct})).filter(x=>x.p>0).sort((a,b)=>b.p-a.p||b.w.likes-a.w.likes).map(x=>x.w);
+/* похожие: сравниваем с тегами открытой работы, саму работу исключаем */
+const similarWorks=id=>{const o=W[id];return WORKS.filter(w=>w.id!==id).map(w=>({w,p:score(w.tags,o.tags).pct})).filter(x=>x.p>=25).sort((a,b)=>b.p-a.p||b.w.likes-a.w.likes).slice(0,12).map(x=>x.w);};
+
+const plural=(n,a,b,c)=>{const d=n%10,dd=n%100;return d===1&&dd!==11?a:d>=2&&d<=4&&(dd<10||dd>=20)?b:c;};
+const tierColor=p=>p>=85?'var(--coral)':p>=60?'var(--coral-soft)':'#E39A6C';
+const fmt=n=>String(n).replace('.',',');
+const tagKind=id=>state.tags.includes(id)?'hit':state.tags.some(q=>related(q).includes(id))?'near':'off';
+
+/* ================= заглушки фотографий ================= */
+let uid=0;
+function nailPath(x,y,w,h,shape){
+  const b=y+h, c=`L${x+w},${b-4} Q${x+w/2},${b+3} ${x},${b-4} Z`;
+  if(shape==='square')return`M${x},${b-4} L${x},${y+3} Q${x},${y} ${x+3},${y} L${x+w-3},${y} Q${x+w},${y} ${x+w},${y+3} ${c}`;
+  if(shape==='stiletto')return`M${x},${b-4} L${x},${y+h*.55} C${x},${y+h*.3} ${x+w*.42},${y+h*.1} ${x+w/2},${y} C${x+w*.58},${y+h*.1} ${x+w},${y+h*.3} ${x+w},${y+h*.55} ${c}`;
+  if(shape==='oval')return`M${x},${b-4} L${x},${y+w/2} A${w/2},${w/2} 0 0 1 ${x+w},${y+w/2} ${c}`;
+  return`M${x},${b-4} L${x},${y+h*.45} C${x},${y+h*.15} ${x+w*.32},${y} ${x+w/2},${y} C${x+w*.68},${y} ${x+w},${y+h*.15} ${x+w},${y+h*.45} ${c}`;
+}
+const star=(x,y,s)=>`<path d="M${x} ${y-s}L${x+s*.3} ${y-s*.3}L${x+s} ${y}L${x+s*.3} ${y+s*.3}L${x} ${y+s}L${x-s*.3} ${y+s*.3}L${x-s} ${y}L${x-s*.3} ${y-s*.3}Z" fill="#fff"/>`;
+function art(w,{ratio,cover=false}={}){
+  const r=ratio||w.r, H=Math.round(100*r), skin=M[w.m].skin, id='n'+(uid++);
+  if(w.img&&!cover&&!ratio)return`<img src="${w.img}" alt="${esc(w.t)}" loading="lazy">`;
+  const L={long:34,mid:22,short:10}[w.len], nh=14+L, extra=(H-100)*.6;
+  const F=[46,58,54,42].map(f=>f+extra), xs=[17,35.5,54,72.5], fw=17, ang=[-7,-2.5,2.5,7];
+  let defs=`<linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${w.c[0]}"/><stop offset="1" stop-color="${w.c[1]}"/></linearGradient>
+    <linearGradient id="${id}s" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${skin}"/><stop offset=".55" stop-color="${skin}"/><stop offset="1" stop-color="#000" stop-opacity=".12"/></linearGradient>
+    <radialGradient id="${id}l" cx=".25" cy=".15" r=".9"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="${id}m" cx=".35" cy=".35" r=".7"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#C9CED6"/><stop offset="1" stop-color="#6E7480"/></radialGradient>
+    <filter id="${id}b" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.6"/></filter>`;
+  let body='';
+  xs.forEach((x,k)=>{
+    const top=H-F[k], ny=top+14-nh, cx=x+fw/2, p=nailPath(x+2,ny,fw-4,nh,w.shape), cl=`clip-path="url(#${id}c${k})"`;
+    defs+=`<clipPath id="${id}c${k}"><path d="${p}"/></clipPath>`;
+    let g=`<rect x="${x}" y="${top}" width="${fw}" height="${F[k]+40}" rx="${fw/2}" fill="url(#${id}s)"/><path d="${p}" fill="url(#${id}g)"/>`;
+    if(w.deco==='chrome')g+=`<g ${cl}><ellipse cx="${cx-2.5}" cy="${ny+nh*.45}" rx="3" ry="${nh*.34}" fill="#fff" opacity=".65"/></g>`;
+    if(w.deco==='cateye')g+=`<g ${cl}><ellipse cx="${cx+(k%2?1.5:-1.5)}" cy="${ny+nh*.5}" rx="2.6" ry="${nh*.42}" fill="${w.glow}" filter="url(#${id}b)" opacity=".95"/></g>`;
+    if(w.deco==='stars')g+=`<g ${cl}><ellipse cx="${cx}" cy="${ny+nh*.5}" rx="2.4" ry="${nh*.38}" fill="${w.glow||'#fff'}" filter="url(#${id}b)" opacity=".7"/>${star(cx+(k%2?-2:2),ny+nh*.35,2.6)}${k%2?star(cx+2,ny+nh*.7,1.6):''}</g>`;
+    if(w.deco==='dots')g+=`<g fill="#fff">${[.35,.55,.75].slice(0,(k%3)+1).map(f=>`<circle cx="${cx}" cy="${ny+nh*f}" r="1.6"/>`).join('')}</g>`;
+    if(w.deco==='drops')g+=`<g ${cl} fill="url(#${id}m)"><circle cx="${cx-2}" cy="${ny+nh*(.35+k*.07)}" r="2.6"/><circle cx="${cx+2.5}" cy="${ny+nh*(.62-k*.04)}" r="${1.6+k*.3}"/></g>`;
+    if(w.deco==='chain')g+=`<g ${cl} fill="none" stroke="#D9DDE3" stroke-width="1.1">${[.3,.45,.6,.75].map(f=>`<ellipse cx="${cx}" cy="${ny+nh*f}" rx="2" ry="2.8"/>`).join('')}</g>`;
+    if(w.deco==='lines')g+=`<g ${cl} stroke="${k%2?'#fff':'#111'}" stroke-width="1.2" opacity=".85"><path d="M${x} ${ny+nh*.3} L${x+fw} ${ny+nh*.55}"/><path d="M${x} ${ny+nh*.55} L${x+fw} ${ny+nh*.8}"/></g>`;
+    if(w.deco==='french')g+=`<g ${cl}><path d="M${x} ${ny+nh*.32} Q${cx} ${ny+nh*.5} ${x+fw} ${ny+nh*.32} L${x+fw} ${ny-2} L${x} ${ny-2}Z" fill="${w.tip||'#fff'}"/></g>`;
+    g+=`<g ${cl}><rect x="${x+4.2}" y="${ny+nh*.22}" width="1.5" height="${nh*.42}" rx=".75" fill="#fff" opacity=".45"/></g>`;
+    body+=`<g transform="rotate(${ang[k]} ${cx} ${H+30})">${g}</g>`;
+  });
+  const ar=cover?'preserveAspectRatio="xMidYMid slice"':'';
+  return`<svg viewBox="0 0 100 ${H}" ${ar} role="img" aria-label="${esc(w.t)}"><defs>${defs}</defs><rect width="100" height="${H}" fill="${w.bg}"/><rect width="100" height="${H}" fill="url(#${id}l)"/>${body}</svg>`;
+}
+const avaBg=m=>`linear-gradient(135deg,${m.av[0]},${m.av[1]})`;
+const ava=m=>`<div class="ava" style="background:${avaBg(m)}"><span>${m.ini}</span></div>`;
+const pinIcon=`<svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>`;
+const xIcon=`<svg viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9"/></svg>`;
+const heart=`<svg viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/></svg>`;
+
+/* сетка в две колонки: каждая следующая работа уходит в более короткую колонку, порядок сверху вниз сохраняется */
+function masonry(list){
+  const cols=[[],[]],h=[0,0];
+  list.forEach(w=>{const i=h[0]<=h[1]?0:1;cols[i].push(w);h[i]+=w.r+.22;});
+  return`<div class="masonry">${cols.map(c=>`<div class="col">${c.map(pinCard).join('')}</div>`).join('')}</div>`;
+}
+function pinCard(w){
+  const m=M[w.m];
+  return`<button class="pin" type="button" data-act="work" data-id="${w.id}">${art(w)}
+    <span class="pin-cap"><i style="background:${avaBg(m)}"></i>${m.name}<span class="liked" data-liked="${w.id}" ${liked.has(w.id)?'':'hidden'}>♥</span></span></button>`;
+}
+
+/* ================= экраны ================= */
+const CONF={
+  query:{hdr:'clear',step:1},
+  tags:{hdr:'solid',step:2},
+  search:{hdr:'clear',step:3},
+  feed:{hdr:'solid',step:4},
+  work:{hdr:'solid',step:5},
+  master:{hdr:'clear',step:6}
+};
+const R={};
+
+R.query=el=>{
+  el.classList.add('grad');
+  el.innerHTML=`
+  <div class="hero">
+    <div class="brand"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#logo"/></svg>CHAOSITY</div>
+    <h1 class="display">Какой маникюр ищем?</h1>
+    <p>Опиши своими словами, какой результат хочешь. Мы разберём запрос на теги и подберём фотографии работ</p>
+  </div>
+  <div class="q-card">
+    <div class="q-label">Твой запрос</div>
+    <textarea id="q-input" maxlength="300" placeholder="Например: короткие квадратные ногти с хромом и стразами">${esc(state.query)}</textarea>
+    <div class="q-foot"><span id="q-count">${state.query.length} / 300</span><button type="button" data-act="clear">Очистить</button></div>
+  </div>
+  <div id="q-ex">
+    <p class="ex-label">Или начни с примера</p>
+    <div class="examples">${EXAMPLES.map((e,i)=>`<button class="ex" type="button" data-act="example" data-i="${i}"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span><b>${e.label}.</b> ${esc(e.text)}</span></button>`).join('')}</div>
+  </div>
+  <div class="found" id="found"></div>`;
+  const ta=el.querySelector('#q-input');
+  ta.addEventListener('input',()=>{state.query=ta.value;el.querySelector('#q-count').textContent=ta.value.length+' / 300';setMain();});
+};
+
+R.tags=el=>{
+  const q=state.query.trim();
+  el.innerHTML=`
+  <h1 class="display" style="font-size:24px">Мы поняли так</h1>
+  <p class="sub">Проверь теги: убери лишнее или добавь своё. По ним подбираем фотографии работ</p>
+  <div class="stack">
+    <div class="block">
+      <div class="block-h"><span class="cap">Твой запрос</span><button class="link" type="button" data-act="back">Изменить</button></div>
+      <div class="quote">${q?marked(state.query,state.ranges):'<span style="color:var(--muted)">Запрос пустой</span>'}</div>
+    </div>
+    <div class="block">
+      <div class="block-h"><span class="cap">Теги · ${state.tags.length}</span></div>
+      ${state.tags.length?'':`<div class="empty">Не получилось выделить характеристики из текста. Добавь их вручную или перепиши запрос.</div>`}
+      <div class="chips">
+        ${state.tags.map(id=>`<span class="chip solid"><button type="button" data-act="group" data-g="${T[id].g}">${T[id].name}</button><button class="x" type="button" data-act="remove" data-id="${id}" aria-label="Убрать тег ${T[id].name}">${xIcon}</button></span>`).join('')}
+        <button class="chip add" type="button" data-act="add">+ Добавить</button>
+      </div>
+      <p class="hint">Нажми на тег, чтобы заменить его похожим. Стиль влияет на подбор сильнее всего.</p>
+    </div>
+  </div>`;
+};
+
+R.search=el=>{
+  el.classList.add('grad');
+  el.innerHTML=`
+  <div class="search">
+    <svg class="orbit" viewBox="0 0 64 64" aria-hidden="true"><use href="#logo"/></svg>
+    <h1 class="display">Ищем подходящие работы</h1>
+    <ul class="checks">${state.tags.map(id=>`<li><i>✓</i>${T[id].name}</li>`).join('')}</ul>
+  </div>`;
+};
+
+R.feed=el=>{
+  const list=feedWorks(), n=list.length;
+  el.innerHTML=`
+  <h1 class="display" style="font-size:22px">Работы по твоему запросу</h1>
+  <p class="sub">${n?`${n} ${plural(n,'работа','работы','работ')} · сначала самые точные совпадения`:'Ничего не нашли. Убери пару тегов или замени их похожими'}</p>
+  <div class="tagrow"><button class="edit" type="button" data-act="back"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Теги</button>${state.tags.map(id=>`<span class="chip sm hit">${T[id].name}</span>`).join('')}</div>
+  ${masonry(list)}`;
+};
+
+R.work=el=>{
+  const w=W[el.dataset.id], m=M[w.m], isL=liked.has(w.id), isS=saved.has(w.id);
+  const tags=[...w.tags].sort((a,b)=>(state.tags.includes(b)-state.tags.includes(a)));
+  el.innerHTML=`
+  <div class="w-img">${art(w)}</div>
+  <div class="w-bar">
+    <button class="likebtn" type="button" data-act="like" data-id="${w.id}" aria-pressed="${isL}" aria-label="Нравится">${heart}<span>${w.likes+(isL?1:0)}</span></button>
+    <button class="savebtn" type="button" data-act="save" data-id="${w.id}" aria-pressed="${isS}">${isS?'Сохранено':'Сохранить'}</button>
+  </div>
+  <div class="w-body">
+    <h1 class="display">${w.t}</h1>
+    <p class="about">${w.d}</p>
+    <div class="chips">${tags.map(id=>`<span class="chip sm ${tagKind(id)}">${T[id].name}</span>`).join('')}</div>
+    <button class="author" type="button" data-act="master" data-id="${m.id}">${ava(m)}<span><b>${m.name}</b><small>${m.spec}</small></span><svg class="chev" viewBox="0 0 9 15"><path d="M1.5 1.5l6 6-6 6"/></svg></button>
+  </div>
+  <h2 class="display h-sim">Похожие работы</h2>
+  ${masonry(similarWorks(w.id))}`;
+};
+
+R.master=el=>{
+  const m=M[el.dataset.id], s=score(m.tags,state.tags), mine=WORKS.filter(w=>w.m===m.id);
+  const own=[...m.tags].sort((a,b)=>(state.tags.includes(b)-state.tags.includes(a)));
+  el.innerHTML=`
+  <div class="cover">${art(mine[0],{ratio:1,cover:true})}</div>
+  <div class="p-head">${ava(m)}<h1 class="display">${m.name}</h1><div class="c-spec">${m.spec}</div>
+    <div class="facts"><span class="fact">${pinIcon}${m.addr}</span><span class="fact"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>${m.exp}</span></div></div>
+  <div class="stack">
+    ${state.tags.length?`<div class="block">
+      <div class="match"><div class="ring" style="--p:${s.pct};--c:${tierColor(s.pct)}"><b>${s.pct}%</b></div>
+        <div><h2>Совпадение с запросом</h2><p>${fmt(s.got)} из ${s.tot} баллов по твоим тегам</p></div></div>
+      <ul class="rows">${s.rows.map(r=>`<li class="${r.kind}"><i>${r.kind==='yes'?'✓':r.kind==='near'?'≈':'–'}</i>
+        <span>${T[r.id].name}<small>${r.kind==='yes'?'есть в профиле':r.kind==='near'?'делает похожее: '+T[r.via].name.toLowerCase():'нет в профиле'}</small></span>
+        <em>+${fmt(r.pts)} / ${r.w}</em></li>`).join('')}</ul>
+      <p class="formula">Каждый тег весит по-разному: стиль 4 балла, длина, форма и дизайн по 2, остальное по 1. За похожую характеристику начисляем половину.</p>
+    </div>`:''}
+    <div class="block"><div class="block-h"><span class="cap">О мастере</span></div><p class="about">${m.about}</p></div>
+    <div class="block"><div class="block-h"><span class="cap">Специализация</span></div><p class="about">${m.focus}</p></div>
+    <div class="block"><div class="block-h"><span class="cap">Теги и навыки</span></div>
+      <div class="chips">${own.map(id=>`<span class="chip sm ${tagKind(id)}">${T[id].name}</span>`).join('')}</div></div>
+    <div class="block"><div class="block-h"><span class="cap">Работы · ${mine.length}</span></div>
+      <div class="works">${mine.map(w=>`<button type="button" data-act="work" data-id="${w.id}" aria-label="${esc(w.t)}">${art(w,{ratio:1})}</button>`).join('')}</div></div>
+  </div>`;
+};
+
+/* ================= навигация ================= */
+const app=document.getElementById('app'), view=document.getElementById('viewport');
+const mainbar=document.getElementById('mainbar'), mainbtn=document.getElementById('mainbtn');
+const tgLeft=document.getElementById('tgLeft');
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const DUR=reduce?0:360;
+let stack=[], busy=false, timers=[];
+const later=(fn,ms)=>{const t=setTimeout(fn,ms);timers.push(t);return t;};
+const cur=()=>stack[stack.length-1];
+
+function make(name,id){const el=document.createElement('section');el.className='screen s-'+name;if(id)el.dataset.id=id;R[name](el);return el;}
+function push(name,{replace=false,id}={}){
+  if(busy)return;busy=true;
+  const el=make(name,id), prev=cur();
+  el.classList.add('enter-right');view.appendChild(el);el.offsetWidth;
+  el.classList.remove('enter-right');
+  if(prev){
+    prev.scroll=prev.el.scrollTop;
+    prev.el.classList.add('leave-left');
+    if(replace){stack.pop();setTimeout(()=>prev.el.remove(),DUR);}
+    else setTimeout(()=>{prev.el.hidden=true;},DUR);
+  }
+  stack.push({name,el});sync();
+  setTimeout(()=>busy=false,DUR);
+}
+function pop(){
+  if(busy||stack.length<2)return;busy=true;
+  timers.forEach(clearTimeout);timers=[];
+  const leaving=stack.pop(), prev=cur();
+  if(prev.name==='tags')R.tags(prev.el);
+  if(prev.name==='query'){prev.el.className='screen s-query leave-left';R.query(prev.el);}
+  prev.el.hidden=false;prev.el.scrollTop=prev.scroll||0;prev.el.offsetWidth;prev.el.classList.remove('leave-left');
+  leaving.el.classList.add("enter-right");
+  setTimeout(()=>{leaving.el.remove();busy=false;},DUR);
+  sync();
+}
+function restart(){
+  timers.forEach(clearTimeout);timers=[];closeSheet(true);
+  view.innerHTML='';stack=[];busy=false;
+  Object.assign(state,{query:EXAMPLES[0].text,tags:[],ranges:[]});
+  const el=make('query');view.appendChild(el);stack.push({name:'query',el});sync();
+}
+function sync(){
+  const c=CONF[cur().name];
+  app.dataset.hdr=c.hdr;
+  tgLeft.innerHTML=stack.length>1?`<svg viewBox="0 0 11 18"><path d="M9 2L2 9l7 7"/></svg>Назад`:'Закрыть';
+  document.querySelectorAll('#steps li').forEach(li=>{const n=+li.dataset.step;li.className=n===c.step?'on':n<c.step?'done':'';});
+  if(tg){
+    try{stack.length>1?tg.BackButton.show():tg.BackButton.hide();}catch(e){}
+    try{tg.setHeaderColor(c.hdr==='clear'?'#FF97A4':'#FBF3F8');}catch(e){}
+  }
+  setMain();
+}
+function setMain(html){
+  const name=cur().name;
+  mainbar.classList.remove('hide');mainbtn.disabled=false;
+  if(html){mainbtn.innerHTML=html;return;}
+  if(name==='query'){mainbtn.textContent='Разобрать запрос';mainbtn.disabled=state.query.trim().length<3;}
+  else if(name==='tags'){const n=state.tags.length;mainbtn.textContent=n?`Найти работы · ${n} ${plural(n,'тег','тега','тегов')}`:'Добавь хотя бы один тег';mainbtn.disabled=!n;}
+  else if(name==='work')mainbtn.textContent='Перейти в профиль мастера';
+  else if(name==='master')mainbtn.textContent='Написать мастеру';
+  else mainbar.classList.add('hide');
+}
+
+/* шаг 1 → 2: разбор запроса */
+function analyze(){
+  const el=cur().el, text=state.query.trim();
+  state.query=text;
+  const r=extract(text);state.tags=r.tags;state.ranges=r.ranges;
+  const card=el.querySelector('.q-card');
+  card.innerHTML=`<div class="q-label">Выделяем характеристики</div><div class="q-text">${marked(text,r.ranges)}</div>`;
+  el.querySelector('#q-ex').hidden=true;
+  setMain('<span class="spin"></span>Разбираем запрос');mainbtn.disabled=true;
+  const marks=card.querySelectorAll('mark'), found=el.querySelector('#found'), step=reduce?0:320;
+  marks.forEach((mk,i)=>later(()=>mk.classList.add('on'),250+i*step));
+  r.tags.forEach((id,i)=>later(()=>found.insertAdjacentHTML('beforeend',`<span class="chip">${T[id].name}</span>`),400+i*step));
+  later(()=>push('tags'),700+Math.max(marks.length,r.tags.length)*step+500);
+}
+/* шаг 3: поиск */
+function search(){
+  push('search');
+  const el=cur().el, step=reduce?0:260;
+  el.querySelectorAll('.checks li').forEach((li,i)=>later(()=>li.classList.add('on'),300+i*step));
+  later(()=>{busy=false;push('feed',{replace:true});},700+state.tags.length*step+400);
+}
+
+/* лайк и сохранение: обновляем все открытые экраны с этой работой, без перерисовки */
+function toggleLike(id){
+  liked.has(id)?liked.delete(id):liked.add(id);store.set('likes',liked);
+  const on=liked.has(id);
+  document.querySelectorAll(`.likebtn[data-id="${id}"]`).forEach(b=>{b.setAttribute('aria-pressed',on);b.querySelector('span').textContent=W[id].likes+(on?1:0);});
+  document.querySelectorAll(`[data-liked="${id}"]`).forEach(s=>s.hidden=!on);
+  try{tg&&tg.HapticFeedback.impactOccurred('light');}catch(e){}
+}
+function toggleSave(id){
+  saved.has(id)?saved.delete(id):saved.add(id);store.set('saved',saved);
+  const on=saved.has(id);
+  document.querySelectorAll(`.savebtn[data-id="${id}"]`).forEach(b=>{b.setAttribute('aria-pressed',on);b.textContent=on?'Сохранено':'Сохранить';});
+  toast(on?'Работа сохранена':'Убрали из сохранённых');
+}
+
+/* шторка с тегами */
+let sheetEl=null, bdEl=null;
+function openSheet(only){
+  closeSheet(true);
+  const groups=only?[only]:Object.keys(GROUPS), g0=only&&GROUPS[only];
+  bdEl=document.createElement('div');bdEl.className='backdrop';bdEl.dataset.act='sheet-close';
+  sheetEl=document.createElement('div');sheetEl.className='sheet';sheetEl.setAttribute('role','dialog');sheetEl.setAttribute('aria-modal','true');
+  sheetEl.innerHTML=`<div class="grab"></div>
+    <div class="sheet-h"><h2>${only?g0.name:'Добавить теги'}</h2><p>${only?(g0.ex?'Можно выбрать один вариант':'Можно выбрать несколько'):'Выбери характеристики, которые важны'}</p></div>
+    <div class="sheet-body">${groups.map(g=>`<div class="grp"><span class="cap">${GROUPS[g].name}${GROUPS[g].ex?' · один вариант':''}</span><div class="chips">${
+      TAGS.filter(t=>t.g===g).map(t=>`<button class="chip" type="button" data-act="toggle" data-id="${t.id}" aria-pressed="${state.tags.includes(t.id)}">${t.name}</button>`).join('')}</div></div>`).join('')}</div>
+    <div class="sheet-foot"><button class="mainbtn" type="button" data-act="sheet-close">Готово</button></div>`;
+  app.append(bdEl,sheetEl);
+  requestAnimationFrame(()=>{bdEl.classList.add('on');sheetEl.classList.add('on');});
+}
+function closeSheet(now){
+  if(!sheetEl)return;
+  const s=sheetEl,b=bdEl;sheetEl=bdEl=null;
+  if(now){s.remove();b.remove();return;}
+  s.classList.remove('on');b.classList.remove('on');setTimeout(()=>{s.remove();b.remove();},320);
+}
+function toggleTag(id){
+  const t=T[id];
+  if(state.tags.includes(id))state.tags=state.tags.filter(x=>x!==id);
+  else{if(GROUPS[t.g].ex)state.tags=state.tags.filter(x=>T[x].g!==t.g);state.tags.push(id);}
+  sheetEl.querySelectorAll('[data-act="toggle"]').forEach(b=>b.setAttribute('aria-pressed',state.tags.includes(b.dataset.id)));
+  rerenderTags();
+}
+function rerenderTags(){if(cur().name==='tags'){R.tags(cur().el);setMain();}}
+
+const toastEl=document.getElementById('toast');let tt;
+function toast(msg){toastEl.textContent=msg;toastEl.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>toastEl.classList.remove('on'),2200);}
+
+/* события */
+app.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const a=b.dataset.act, id=b.dataset.id;
+  if(a==='example'){const ta=document.getElementById('q-input');ta.value=EXAMPLES[+b.dataset.i].text;ta.dispatchEvent(new Event('input'));}
+  else if(a==='clear'){const ta=document.getElementById('q-input');ta.value='';ta.dispatchEvent(new Event('input'));ta.focus();}
+  else if(a==='back')pop();
+  else if(a==='remove'){state.tags=state.tags.filter(x=>x!==id);rerenderTags();}
+  else if(a==='group')openSheet(b.dataset.g);
+  else if(a==='add')openSheet();
+  else if(a==='toggle')toggleTag(id);
+  else if(a==='sheet-close')closeSheet();
+  else if(a==='work')push('work',{id});
+  else if(a==='master')push('master',{id});
+  else if(a==='like')toggleLike(id);
+  else if(a==='save')toggleSave(id);
+});
+mainbtn.addEventListener('click',()=>{
+  const t=cur();
+  if(t.name==='query')analyze();
+  else if(t.name==='tags')search();
+  else if(t.name==='work')push('master',{id:W[t.el.dataset.id].m});
+  else if(t.name==='master'){
+    const m=M[t.el.dataset.id];
+    toast(`Откроется чат с мастером ${m.name.split(' ')[0]} в Telegram`);
+  }
+});
+tgLeft.addEventListener('click',()=>{if(sheetEl)return closeSheet();stack.length>1?pop():toast('В Telegram здесь закроется мини-приложение');});
+document.getElementById('tgMore').addEventListener('click',()=>toast('Меню Telegram: настройки бота, поделиться, сообщить о проблеме'));
+document.getElementById('restart').addEventListener('click',restart);
+
+/* настоящий Telegram: своя шапка и системная кнопка «Назад» */
+const tg=(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.initData)?Telegram.WebApp:null;
+if(tg){
+  document.documentElement.classList.add('in-tg');
+  try{tg.ready();tg.expand();tg.BackButton.onClick(()=>{if(sheetEl)return closeSheet();pop();});}catch(e){}
+}
+
+/* масштаб рамки телефона под высоту окна */
+function fit(){
+  const s=(tg||innerWidth<=520)?1:Math.min(1,(innerHeight-40)/876,(innerWidth-32)/417);
+  document.documentElement.style.setProperty('--s',s.toFixed(3));
+}
+addEventListener('resize',fit);fit();
+restart();
+</script>
+</body>
+</html>
